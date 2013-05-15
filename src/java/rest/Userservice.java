@@ -70,16 +70,6 @@ public class Userservice {
     @Consumes(MediaType.APPLICATION_JSON)
     public Response addUser(User u) {
         try (Connection conn = source.getConnection()) {
-            try (PreparedStatement stat = conn.prepareStatement("SELECT MAX(ID) FROM USER")) {
-                try (ResultSet rs = stat.executeQuery()) {
-                    if (rs.next()) {
-                        u.setId(rs.getInt(1) + 1);
-                    } else {
-                        u.setId(1);
-                    }
-                }
-            }
-            
             try (PreparedStatement stat = conn.prepareStatement("INSERT INTO USER(ID,Naam, Voornaam,email) VALUES(?, ?,?,?)")) {
                 stat.setInt(1, u.getId());
                 stat.setString(2, u.getNaam());

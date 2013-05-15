@@ -1,71 +1,111 @@
 /* 
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
+ * eigen shit
+ * 
  */
-var BASE_URL = "http://localhost:8080/buurtapp_Rest2/Resources";
+ //rest url
+var BASE_URL = "http://localhost:8080/buurtapp_REST2/webresources";
 
-var Meldingen = [];
-var Evenementen = [];
-var User = [];
-var Comments = [];
 
-var selectedMeldingenIndex = undefined;
-var editingMeldingen = false;
+onload = function() {
+laadMeldingen();
+startMap();
+nieuweMelding();
+};
 
-var selectedEvenementenIndex = undefined;
-var editingEvenementen = false;
+function laadMeldingen(){
 
-var selectedUserIndex = indefined;
-var editingUser = false;
+  $.getJSON(BASE_URL + '/melding', OnCallBack);
+  
+  function OnCallBack(data) {
+	console.log(data);//mag later weg
+	var resultLength = data.length;
+	var listItems = [];
+	
+	for(var i=0;i<resultLength;i++){
+	var id = data[i].id;
+	var beschrijving = data[i].beschrijving;
 
-var selectedCommentsIndex = undefined;
-var editingComments = false;
+   //toevoegen aan array
+   listItems.push("<li><a href='#'>"+id+" "+beschrijving+"</a></li>");
+								}
+								
+//array toevoegen aan lijst en vernieuwen
+$('#meldingen').append(listItems.join(' '));
+$('#meldingen').listview('refresh');
+			
+		}
+  	} 
 
-function initialiseLists(){
+function nieuweMelding(){
+$("#nieuweMelding").click(function() {
+      
+    var auteur = new Object();
+    auteur.id =1;
+    //auteur.naam = $('#Naam').val();
+    var locatie = new Object();
+    locatie.latitude = 51.3426606750;
+    locatie.longitude = 4.0736160278;
     
-    //meldingen laden
-    var request = new XMLHttpRequest();
-    request.open("GET", BASE_URL + "/melding");
-    request.onload = function() {
-        if(request.status == 200){
-            Meldingen = JSON.parse(request.responseText);
-            for (var i = 0; i < Meldingen.length; i++){
-                $("#meldingenList").append(createListElementForMeldingen(i));
-            }
-            /*if(Meldingen.length > 0){
-                // show comments from melding ?
-            }else{
-                $(".reminderDialogToggle").attr("disabled", true);
-            }*/
-        }else{
-            console.log("Error loading Melding: " + request.status + " - " + request.statusText);
-        }
-    };
-    request.send(null);
+    var melding = new Object();  
+    //melding.id="";
+    melding.type = $("#cat input[type='radio']:checked").val();
+    melding.locatie=locatie;
+    melding.beschrijving = $("#Omschrijving").val();
+    melding.auteur= auteur ;
+           
+       
+   // console.log(melding);
+    
+    postMelding(melding);
+    
+    });
+}
+    
+function postMelding(melding){
+
+   $.ajax({
+   url: BASE_URL + '/melding' ,
+   data: JSON.stringify(melding),
+   type: 'POST',
+   dataType: 'json',
+   contentType: 'application/json',
+   success: function() {
+   console.log("posted");
+   },
+   error: function(jqXHR, exception){
+       alert("error "+ jqXHR.status);
+   }
+   
+ });
 }
 
-function createListElementForGroup(groupIndex) {
-    
-    var editIcon = $("<i>")
-        .addClass("icon-edit icon-large pull-right")
-        .click(function(event) {
-            event.stopPropagation();
-            
-            // Prepare the dialog for editing instead of adding.
-            editingMelding = true;
-            $("#meldingDialog h3").text("Edit Melding");
-            $("#meldingType").val(Meldingen[meldingIndex].type);
-            $("#meldingBeschrijving").val(Meldingen[meldingIndex].Beschrijving);
-            $("#meldingDialogDelete").show();
-            $("#meldingDialog").modal("show");
-        });
-    
-    var link = $("<a>")
-        .text(Meldingen[meldingIndex].type)
-        .text(Meldingen[meldingIndex].beschrijving)
-        .append(editIcon);
-    
-    return $("<li>")
-        .append(link)
-        ;
-}
+function startMap() {
+                // Also works with: var yourStartLatLng = '59.3426606750, 18.0736160278';
+                var yourStartLatLng = new google.maps.LatLng(25.3426606750, 25.0736160278);
+                $('#map_canvas').gmap({'center': yourStartLatLng});
+        
+				
+				$('#map_canvas').gmap().bind('init', function(evt, map) {
+				$.getJSON( BASE_URL + '/melding', function(data) { 
+				
+				var resultLength = data.length;
+				
+				for(var i=0;i<resultLength;i++){
+				var beschrijving = data[i].beschrijving;
+				var type = data[i].type;
+				$('#map_canvas').gmap('addMarker', { 'position': new google.maps.LatLng(data[i].locatie.latitude, data[i].locatie.longitude),
+				'bounds':true 
+				} ).click(function() {
+				$('#map_canvas').gmap('openInfoWindow', { 'content': type+': ' + beschrijving }, this);
+			});
+				
+				}
+				});                                                                                                                                                                                                                       
+			});
+			//init
+			
+		
+		
+		};
+
+
