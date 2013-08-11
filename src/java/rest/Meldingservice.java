@@ -5,10 +5,16 @@
 package rest;
 
 import domein.Comment;
+import domein.Foto;
 import domein.Locatie;
 import domein.Melding;
 import domein.User;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
+import java.sql.Blob;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -17,10 +23,12 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Resource;
 import javax.ejb.Stateless;
+import javax.imageio.ImageIO;
 import javax.sql.DataSource;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
+import javax.ws.rs.HeaderParam;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
@@ -38,6 +46,9 @@ import org.jboss.logging.Param;
 @Stateless
 @Path("melding")
 public class Meldingservice {
+    
+    
+    private static final int MAX_SIZE_IN_MB = 1;
     
     @Resource(name = "jdbc/buurtapp")
     private DataSource source;
@@ -377,4 +388,117 @@ public class Meldingservice {
             throw new WebApplicationException(ex);
         }
     }
-}
+    
+   @Path("{id}/foto")
+    @GET
+    @Produces("image/jpeg")
+    public InputStream getFirstFotoForMessage(@PathParam("id") int meldingId){
+        try (Connection conn = source.getConnection()) {
+            try (PreparedStatement stat = conn.prepareStatement("SELECT * FROM Melding,Foto INNER JOIN User ON Foto.auteur = user.id WHERE melding.ID = ? AND melding.ID = foto.melding")) {
+                stat.setInt(1, meldingId);
+                try (ResultSet rs = stat.executeQuery()) {
+                    if(rs.next()){
+                        Blob Foto = rs.getBlob("Foto");
+                        InputStream image = Foto.getBinaryStream();
+                        return image;
+                    }
+                }
+                
+            }
+        } catch (SQLException ex) {
+            throw new WebApplicationException(ex);
+        }
+        return null;
+    }
+   
+   @Path("{id}/foto/{fid}")
+    @GET
+    @Produces("image/jpeg")
+    public InputStream getFoto(@PathParam("id") int meldingId,@PathParam("fid") int fotoId){
+        try (Connection conn = source.getConnection()) {
+            try (PreparedStatement stat = conn.prepareStatement("SELECT * FROM Melding,Foto INNER JOIN User ON Foto.auteur = user.id WHERE Foto.ID = ? AND melding.ID = ?")) {
+                stat.setInt(1, fotoId);
+                stat.setInt(2, meldingId);
+                try (ResultSet rs = stat.executeQuery()) {
+                    if(rs.next()){
+                        Blob Foto = rs.getBlob("Foto");
+                        InputStream image = Foto.getBinaryStream();
+                        return image;
+                    }
+                }
+                
+            }
+        } catch (SQLException ex) {
+            throw new WebApplicationException(ex);
+        }
+        return null;
+    }     
+   
+   @Path("{id}/foto")
+    @POST
+    @Consumes({"image/jpeg", "image/png"})
+    public Response addFotoToMessage(@PathParam("id") int meldingId, InputStream in, @HeaderParam("Content-auteur") int aid, @HeaderParam("Content-Type") String fileType, @HeaderParam("Content-Length") long fileSize){
+        try (Connection conn = source.getConnection()) {
+            Foto f = new Foto();
+            User a = new User();
+            a.setId(aid);
+            f.setAuteur(a);
+            
+            if(f.getAuteur() == null){
+                throw new WebApplicationException(Response.status(Response.Status.BAD_REQUEST).entity("Een comment moet een auteur hebben.").build());
+            }
+            
+           if (fileSize > 1024 * 1024 * MAX_SIZE_IN_MB) {
+            throw new WebApplicationException(Response.status(Response.Status.BAD_REQUEST).entity("Image is larger than " + MAX_SIZE_IN_MB + "MB").build());
+        }
+            
+            try (PreparedStatement stat = conn.prepareStatement("SELECT MAX(ID) FROM Foto")) {
+                try (ResultSet rs = stat.executeQuery()) {
+                    if (rs.next()) {
+                        f.setId(rs.getInt(1) + 1);
+                    } else {
+                        f.setId(1);
+                    }
+                }
+            }
+            
+            
+            try (PreparedStatement stat = conn.prepareStatement("INSERT INTO Foto (id,foto,auteur,melding) VALUES(?, ?, ?, ?)")) {
+                stat.setInt(1, f.getId());
+                stat.setBinaryStream(2, in);
+                stat.setInt(3, f.getAuteur().getId());
+                stat.setInt(4, meldingId);
+                stat.executeUpdate();
+            }
+            
+            return Response.created(URI.create("/" + f.getId())).build();
+            
+        } catch (SQLException ex) {
+            throw new WebApplicationException(ex);
+        }        
+    }
+   
+   @Path("{id}/foto/{fid}")
+    @DELETE
+    @Consumes(MediaType.APPLICATION_JSON)
+    public void removeFoto(@PathParam("id") int meldingId,@PathParam("fid") int fotoId){
+         try (Connection conn = source.getConnection()) {
+            try (PreparedStatement stat = conn.prepareStatement("SELECT * FROM Foto WHERE ID = ? AND melding = ?")) {
+                stat.setInt(1, fotoId);
+                stat.setInt(2, meldingId);
+                try (ResultSet rs = stat.executeQuery()) {
+                    if (!rs.next()) {
+                        throw new WebApplicationException(Response.Status.NOT_FOUND);
+                    }
+                }
+            }
+            
+            try (PreparedStatement stat = conn.prepareStatement("DELETE FROM Foto WHERE ID = ?")) {
+                stat.setInt(1, fotoId);
+                stat.executeUpdate();
+            }
+        } catch (SQLException ex) {
+            throw new WebApplicationException(ex);
+        }
+    }
+}       

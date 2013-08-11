@@ -4,7 +4,7 @@
  */
 package domein;
 
-import java.io.File;
+import java.awt.image.BufferedImage;
 
 /**
  *
@@ -13,10 +13,11 @@ import java.io.File;
 public class Foto {
  
     private int id;
-    private File foto;
+    private BufferedImage foto;
     private User auteur;
     private Melding melding;
     private Event event;
+
 
     public int getId() {
         return id;
@@ -26,11 +27,11 @@ public class Foto {
         this.id = id;
     }
 
-    public File getFoto() {
+    public BufferedImage getFoto() {
         return foto;
     }
 
-    public void setFoto(File foto) {
+    public void setFoto(BufferedImage foto) {
         this.foto = foto;
     }
 
